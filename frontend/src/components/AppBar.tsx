@@ -42,10 +42,6 @@ export const AppBar: React.FC = () => {
             style={{ background: isDevnet ? 'rgba(251,191,36,0.1)' : 'rgba(16,185,129,0.1)', color: isDevnet ? '#fbbf24' : '#34d399', border: `1px solid ${isDevnet ? 'rgba(251,191,36,0.2)' : 'rgba(16,185,129,0.2)'}` }}>
             {isDevnet ? '⚡ Devnet' : '🌐 Mainnet'}
           </span>
-          <span className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-            style={{ background: 'rgba(139,92,246,0.1)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}>
-            🤖 Binance Testnet
-          </span>
           {walletShort && (
             <span className="font-mono text-[10px] text-slate-600">{walletShort}</span>
           )}
