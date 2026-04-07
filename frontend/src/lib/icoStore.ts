@@ -1,28 +1,24 @@
 /**
  * src/lib/icoStore.ts
  *
- * In-process singleton store for ICO state.
- * Next.js API routes run in the same Node process (dev + prod),
- * so this module acts as a lightweight in-memory database.
- *
- * For production you'd swap this with Postgres / Redis / Firestore,
- * but the API surface stays identical.
+ * FIX: Price history now generates points every 5 minutes (not every 1h),
+ * ensuring the 1h chart always has enough data points to render.
  */
 
 export interface IcoProjectState {
   id: string;
-  mintAddress: string | null;   // null until /api/create-token is called
+  mintAddress: string | null;
   raisedSol: number;
   soldTokens: number;
   totalTokens: number;
-  basePrice: number;            // price in SOL at genesis
+  basePrice: number;
   decimals: number;
 }
 
 export interface PricePoint {
   timestamp: number;
   price: number;
-  volume: number;   // SOL traded in this tick
+  volume: number;
 }
 
 export interface TxRecord {
@@ -36,18 +32,16 @@ export interface TxRecord {
   projectId: string;
 }
 
-// ─── Singleton guard (hot-reload safe) ───────────────────────────────────────
 const g = global as any;
 
 if (!g.__icoStore) {
   g.__icoStore = {
-    projects: new Map<string, IcoProjectState>(),
-    priceHistory: new Map<string, PricePoint[]>(),
-    transactions: [] as TxRecord[],
+    projects: new Map(),
+    priceHistory: new Map(),
+    transactions: [],
   };
 
-  // Seed initial project states that mirror PROJECTS in the frontend
-  const seed: Omit<IcoProjectState, 'mintAddress'>[] = [
+  const seed = [
     { id: 'oracle-data',  raisedSol: 3247, soldTokens: 64200,  totalTokens: 100000, basePrice: 0.15, decimals: 6 },
     { id: 'green-chain',  raisedSol: 2150, soldTokens: 41800,  totalTokens: 200000, basePrice: 0.08, decimals: 6 },
     { id: 'ai-compute',   raisedSol: 9800, soldTokens: 72000,  totalTokens: 80000,  basePrice: 0.25, decimals: 6 },
@@ -56,51 +50,43 @@ if (!g.__icoStore) {
   ];
 
   const now = Date.now();
+  const INTERVAL_MS = 5 * 60 * 1_000; // 5 minutes
+  const POINTS = 7 * 24 * 12;         // 2016 points = 7 days
+
   for (const s of seed) {
     g.__icoStore.projects.set(s.id, { ...s, mintAddress: null });
 
-    // Generate 30 synthetic price-history points per project
-    const pts: PricePoint[] = [];
-    let price = s.basePrice;
-    for (let i = 29; i >= 0; i--) {
-      price = price * (0.97 + Math.random() * 0.06);
+    const pts = [];
+    let price = s.basePrice * 0.85;
+    for (let i = POINTS - 1; i >= 0; i--) {
+      price = price * (0.999 + Math.random() * 0.004);
+      if (Math.random() < 0.02) price *= 1 + (Math.random() - 0.4) * 0.05;
+      price = Math.max(s.basePrice * 0.5, price);
       pts.push({
-        timestamp: now - i * 3_600_000,
+        timestamp: now - i * INTERVAL_MS,
         price: parseFloat(price.toFixed(6)),
-        volume: parseFloat((Math.random() * 50).toFixed(4)),
+        volume: parseFloat((Math.random() * 20 + 1).toFixed(4)),
       });
     }
     g.__icoStore.priceHistory.set(s.id, pts);
   }
 }
 
-export const store: {
-  projects: Map<string, IcoProjectState>;
-  priceHistory: Map<string, PricePoint[]>;
-  transactions: TxRecord[];
-} = g.__icoStore;
+export const store = g.__icoStore;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Dynamic bonding-curve price: price = basePrice * (1 + soldTokens/totalTokens) */
-export function currentPrice(projectId: string): number {
+export function currentPrice(projectId) {
   const p = store.projects.get(projectId);
   if (!p) return 0;
-  return parseFloat(
-    (p.basePrice * (1 + p.soldTokens / p.totalTokens)).toFixed(6)
-  );
+  return parseFloat((p.basePrice * (1 + p.soldTokens / p.totalTokens)).toFixed(6));
 }
 
-/** Record a new price tick after a buy/sell */
-export function pushPricePoint(projectId: string, price: number, volume: number) {
+export function pushPricePoint(projectId, price, volume) {
   const hist = store.priceHistory.get(projectId) ?? [];
   hist.push({ timestamp: Date.now(), price, volume });
-  // Keep last 500 points
-  if (hist.length > 500) hist.splice(0, hist.length - 500);
+  if (hist.length > 2500) hist.splice(0, hist.length - 2500);
   store.priceHistory.set(projectId, hist);
 }
 
-/** Generate a short UUID-ish id */
-export function uid(): string {
+export function uid() {
   return Math.random().toString(36).slice(2, 10);
 }

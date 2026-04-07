@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EventStatus {
+  OPEN
+  RESOLVED
+  CANCELLED
+}
+
+enum FeedItemType {
+  EVENT_CREATED
+  BET_PLACED
+  EVENT_RESOLVED
+  AI_ACTIVITY
+  TOKEN_CREATED
+  VIDEO_GENERATED
+  WALLET_ACTION
+}
+
+enum WalletTxType {
+  DEPOSIT
+  BET_DEBIT
+  REWARD_CREDIT
+  TRANSFER_OUT
+}
+
+model User {
+  id             String              @id @default(cuid())
+  email          String?             @unique
+  username       String              @unique
+  phantomAddress String?             @unique
+  isAdmin        Boolean             @default(false)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  wallet         Wallet?
+  bets           Bet[]
+  tokenHoldings  UserTokenHolding[]
+}
+
+model Wallet {
+  id           String      @id @default(cuid())
+  userId       String      @unique
+  balance      Decimal     @default(0) @db.Decimal(18, 6)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTx[]
+}
+
+model WalletTx {
+  id          String       @id @default(cuid())
+  walletId    String
+  type        WalletTxType
+  amount      Decimal      @db.Decimal(18, 6)
+  description String
+  refId       String?
+  createdAt   DateTime     @default(now())
+  wallet      Wallet       @relation(fields: [walletId], references: [id], onDelete: Cascade)
+}
+
+model MarketEvent {
+  id             String       @id @default(cuid())
+  title          String
+  description    String
+  endTime        DateTime
+  status         EventStatus  @default(OPEN)
+  winningOption  String?
+  totalLiquidity Decimal      @default(0) @db.Decimal(18, 6)
+  createdBy      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  options        EventOption[]
+  bets           Bet[]
+}
+
+model EventOption {
+  id          String      @id @default(cuid())
+  eventId     String
+  label       String
+  liquidity   Decimal     @default(0) @db.Decimal(18, 6)
+  percentage  Decimal     @default(0) @db.Decimal(5, 2)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  event       MarketEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  bets        Bet[]
+}
+
+model Bet {
+  id            String      @id @default(cuid())
+  userId        String
+  eventId       String
+  optionId      String
+  amount        Decimal     @db.Decimal(18, 6)
+  payout        Decimal?    @db.Decimal(18, 6)
+  isWinner      Boolean?
+  createdAt     DateTime    @default(now())
+  resolvedAt    DateTime?
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event         MarketEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  option        EventOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+}
+
+model PlatformToken {
+  id          String   @id @default(cuid())
+  name        String
+  symbol      String   @unique
+  supply      Decimal  @db.Decimal(24, 6)
+  logoUrl     String?
+  price       Decimal  @default(1) @db.Decimal(18, 6)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  holders     UserTokenHolding[]
+}
+
+model UserTokenHolding {
+  id        String        @id @default(cuid())
+  userId    String
+  tokenId   String
+  amount    Decimal       @default(0) @db.Decimal(24, 6)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     PlatformToken @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tokenId])
+}
+
+model FeedItem {
+  id        String       @id @default(cuid())
+  type      FeedItemType
+  message   String
+  metadata  Json?
+  createdAt DateTime     @default(now())
+}

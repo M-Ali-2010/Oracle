@@ -10,6 +10,7 @@ import useUserSOLBalanceStore from '../../stores/useUserSOLBalanceStore';
 import useTransactionStore, { TxRecord } from '../../stores/useTransactionStore';
 import { notify } from '../../utils/notifications';
 import { solscanClusterQuery } from '../../lib/solana/cluster';
+import { formatIntEnUS } from '../../utils/formatEnUS';
 import {
   LAMPORTS_PER_SOL,
   SystemProgram,
@@ -28,6 +29,20 @@ import {
   Area,
   AreaChart,
 } from 'recharts';
+import {
+  buyToken,
+  createUser,
+  deposit,
+  getDashboard,
+  getEvents,
+  getFeed,
+  getTokens,
+  getWalletTransactions,
+  MarketEvent,
+  MarketToken,
+  placeBet,
+  sellToken,
+} from '../../lib/marketApi';
 
 const WalletMultiButtonDynamic = dynamic(
   async () => (await import('@solana/wallet-adapter-react-ui')).WalletMultiButton,
@@ -81,16 +96,6 @@ interface ChartPoint {
   volume: number;
 }
 
-interface PredictionMarket {
-  id: string;
-  question: string;
-  yesPercent: number;
-  volume: number;
-  expiry: string;
-  category: string;
-  totalBets: number;
-}
-
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const TREASURY = process.env.NEXT_PUBLIC_TREASURY_WALLET ?? 'DVXt9pcAUPNEfFRuiXGxNMFuT7SAabABcxqb7Hn5Y7FE';
@@ -141,12 +146,6 @@ const BASE_PROJECTS: IcoProject[] = [
     deadline: '2025-06-01', apy: 15, tags: ['DePIN', '5G', 'IoT'],
     accentColor: '#ec4899', status: 'completed', change24h: 0,
   },
-];
-
-const PREDICTION_MARKETS: PredictionMarket[] = [
-  { id: 'pm1', question: 'Will SOL exceed $300 before July 2025?', yesPercent: 67, volume: 142500, expiry: '2025-07-01', category: 'Crypto', totalBets: 3841 },
-  { id: 'pm2', question: 'Will Bitcoin ETF AUM reach $100B in 2025?', yesPercent: 44, volume: 89200, expiry: '2025-12-31', category: 'Markets', totalBets: 2104 },
-  { id: 'pm3', question: 'Will Ethereum complete the next upgrade by Q3?', yesPercent: 78, volume: 56700, expiry: '2025-09-30', category: 'Crypto', totalBets: 1728 },
 ];
 
 const ICO_AIRDROPS = [
@@ -458,7 +457,7 @@ const ProjectCard: FC<{
           <div className="flex justify-between text-xs mb-2">
             <span className="text-white/30">Raised</span>
             <span className="text-white/60 font-medium tabular-nums">
-              {p.raisedSol.toLocaleString("en-US")} / {p.goalSol.toLocaleString("en-US")} SOL
+              {formatIntEnUS(p.raisedSol)} / {formatIntEnUS(p.goalSol)} SOL
               <span className="text-white/30 ml-1">({progress}%)</span>
             </span>
           </div>
@@ -509,55 +508,94 @@ const ProjectCard: FC<{
 
 // ─── Prediction Market Card ────────────────────────────────────────────────────
 
-const PredictionCard: FC<{ market: PredictionMarket }> = ({ market: m }) => {
-  const noPercent = 100 - m.yesPercent;
+const PredictionCard: FC<{
+  market: MarketEvent;
+  userId: string | null;
+  onBet: (eventId: string, optionId: string, amount: number) => Promise<void>;
+}> = ({ market: m, userId, onBet }) => {
+  const [betAmount, setBetAmount] = useState('2');
+  const [busyOption, setBusyOption] = useState<string | null>(null);
+  const noPercent = Math.max(0, 100 - Number(m.options?.[0]?.percentage ?? 0));
+  const yesLike = Number(m.options?.[0]?.percentage ?? 0);
+  const canBet = m.status === 'OPEN' && !!userId;
+
+  const submitBet = async (optionId: string) => {
+    if (!canBet) return;
+    const amount = parseFloat(betAmount);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    setBusyOption(optionId);
+    try {
+      await onBet(m.id, optionId, amount);
+    } finally {
+      setBusyOption(null);
+    }
+  };
+
   return (
     <div className={`${glass.card} ${glass.cardHover} rounded-2xl p-5 transition-all duration-200`}>
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
-          <Badge>{m.category}</Badge>
-          <p className="text-sm font-semibold text-white mt-2 leading-snug">{m.question}</p>
+          <Badge>{m.status}</Badge>
+          <p className="text-sm font-semibold text-white mt-2 leading-snug">{m.title}</p>
+          <p className="text-xs text-white/35 mt-1">{m.description}</p>
         </div>
         <div className="flex-shrink-0 text-right">
           <p className="text-[10px] text-white/25">Expires</p>
-          <p className="text-xs text-white/50">{daysLeft(m.expiry)}d</p>
+          <p className="text-xs text-white/50">{daysLeft(m.endTime)}d</p>
         </div>
       </div>
 
       {/* YES/NO bars */}
       <div className="flex gap-1.5 mb-3 rounded-xl overflow-hidden" style={{ height: 6 }}>
-        <div className="h-full rounded-full transition-all" style={{ width: `${m.yesPercent}%`, background: '#10b981' }} />
+        <div className="h-full rounded-full transition-all" style={{ width: `${yesLike}%`, background: '#10b981' }} />
         <div className="flex-1 h-full rounded-full transition-all" style={{ background: '#ef4444' }} />
       </div>
 
       <div className="flex justify-between mb-4">
         <div className="flex items-center gap-1.5">
           <div className="h-2 w-2 rounded-full bg-emerald-500" />
-          <span className="text-xs font-bold text-emerald-400">{m.yesPercent}% Yes</span>
+          <span className="text-xs font-bold text-emerald-400">{yesLike.toFixed(1)}% {m.options?.[0]?.label ?? 'YES'}</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs font-bold text-red-400">{noPercent}% No</span>
+          <span className="text-xs font-bold text-red-400">{noPercent.toFixed(1)}% {m.options?.[1]?.label ?? 'NO'}</span>
           <div className="h-2 w-2 rounded-full bg-red-500" />
         </div>
       </div>
 
       <div className="flex items-center justify-between mb-4">
-        <span className="text-[10px] text-white/25">Vol: ${fmtCompact(m.volume)}</span>
-        <span className="text-[10px] text-white/25">{fmtCompact(m.totalBets)} bets</span>
+        <span className="text-[10px] text-white/25">Liquidity: ${fmtCompact(Number(m.totalLiquidity || 0))}</span>
+        <span className="text-[10px] text-white/25">{fmtCompact(m.bets?.length ?? 0)} bets</span>
+      </div>
+      <div className="mb-3">
+        <input
+          value={betAmount}
+          onChange={(e) => setBetAmount(e.target.value)}
+          type="number"
+          min="0.1"
+          step="0.1"
+          className={`w-full rounded-xl px-3 py-2 text-xs ${glass.input}`}
+          placeholder="Bet amount"
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <button className="rounded-xl py-2.5 text-xs font-bold text-emerald-400 transition-all"
+        <button
+          disabled={!canBet || !m.options?.[0]}
+          onClick={() => m.options?.[0] && submitBet(m.options[0].id)}
+          className="rounded-xl py-2.5 text-xs font-bold text-emerald-400 transition-all disabled:opacity-40"
           style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}
           onMouseEnter={e => (e.currentTarget.style.background = 'rgba(16,185,129,0.18)')}
           onMouseLeave={e => (e.currentTarget.style.background = 'rgba(16,185,129,0.1)')}>
-          Bet YES
+          {busyOption === m.options?.[0]?.id ? 'Placing...' : `Bet ${m.options?.[0]?.label ?? 'YES'}`}
         </button>
-        <button className="rounded-xl py-2.5 text-xs font-bold text-red-400 transition-all"
+        <button
+          disabled={!canBet || !m.options?.[1]}
+          onClick={() => m.options?.[1] && submitBet(m.options[1].id)}
+          className="rounded-xl py-2.5 text-xs font-bold text-red-400 transition-all disabled:opacity-40"
           style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}
           onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.18)')}
           onMouseLeave={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}>
-          Bet NO
+          {busyOption === m.options?.[1]?.id ? 'Placing...' : `Bet ${m.options?.[1]?.label ?? 'NO'}`}
         </button>
       </div>
     </div>
@@ -1095,9 +1133,8 @@ export const HomeView: FC = () => {
   const { connection } = useConnection();
   const clusterLabel = useMemo(() => {
     const ep = connection.rpcEndpoint;
-    if (/devnet/i.test(ep)) return 'Devnet';
-    if (/testnet/i.test(ep)) return 'Testnet';
-    return 'Mainnet';
+    if (/mainnet/i.test(ep)) return 'Main';
+    return 'Live';
   }, [connection]);
   const clusterQs = useMemo(() => solscanClusterQuery(connection.rpcEndpoint), [connection]);
   const balance = useUserSOLBalanceStore(s => s.balance);
@@ -1117,6 +1154,14 @@ export const HomeView: FC = () => {
   const [showChart, setShowChart] = useState<string | null>(null);
   const [projects, setProjects] = useState<IcoProject[]>(BASE_PROJECTS);
   const [icoTxs, setIcoTxs] = useState<Array<{ wallet: string; type: string; solAmount: number; tokenAmount: number; txHash: string; timestamp: number; projectId: string }>>([]);
+  const [marketUserId, setMarketUserId] = useState<string | null>(null);
+  const [marketEvents, setMarketEvents] = useState<MarketEvent[]>([]);
+  const [marketFeed, setMarketFeed] = useState<any[]>([]);
+  const [walletHistory, setWalletHistory] = useState<any[]>([]);
+  const [marketTokens, setMarketTokens] = useState<MarketToken[]>([]);
+  const [dashboardWalletBalance, setDashboardWalletBalance] = useState<number>(0);
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [marketError, setMarketError] = useState<string | null>(null);
 
   const walletAddress = useMemo(() => wallet.publicKey?.toBase58() ?? null, [wallet.publicKey]);
   const walletShort = useMemo(() => walletAddress ? short(walletAddress) : null, [walletAddress]);
@@ -1149,6 +1194,50 @@ export const HomeView: FC = () => {
 
   useEffect(() => { getSolPrice(); const id = setInterval(getSolPrice, 60_000); return () => clearInterval(id); }, [getSolPrice]);
   useEffect(() => { syncPrices(); const id = setInterval(syncPrices, 30_000); return () => clearInterval(id); }, [syncPrices]);
+
+  useEffect(() => {
+    if (!walletAddress) return;
+    const run = async () => {
+      const username = `u_${walletAddress.slice(0, 10)}`;
+      const user = await createUser(username, walletAddress).catch(() => null);
+      if (user?.id) setMarketUserId(user.id);
+    };
+    run();
+  }, [walletAddress]);
+
+  const loadMarketData = useCallback(async () => {
+    if (!marketUserId) return;
+    setMarketLoading(true);
+    setMarketError(null);
+    try {
+      const [events, feed, dashboard, walletTx, tokens] = await Promise.all([
+        getEvents(),
+        getFeed(50),
+        getDashboard(marketUserId),
+        getWalletTransactions(marketUserId, 50),
+        getTokens(),
+      ]);
+      setMarketEvents(events);
+      setMarketFeed(feed);
+      setDashboardWalletBalance(Number(dashboard?.wallet?.balance ?? 0));
+      setWalletHistory(walletTx);
+      setMarketTokens(tokens);
+    } catch (err: any) {
+      setMarketError(err?.message ?? 'Failed to load market data');
+    } finally {
+      setMarketLoading(false);
+    }
+  }, [marketUserId]);
+
+  useEffect(() => {
+    if (!marketUserId) return;
+    loadMarketData();
+    const fastPoll = setInterval(() => {
+      getFeed(50).then(setMarketFeed).catch(() => undefined);
+      getEvents().then(setMarketEvents).catch(() => undefined);
+    }, 7000);
+    return () => clearInterval(fastPoll);
+  }, [marketUserId, loadMarketData]);
   useEffect(() => {
     if (wallet.publicKey) {
       getUserSOLBalance(wallet.publicKey, connection);
@@ -1156,6 +1245,25 @@ export const HomeView: FC = () => {
       loadIcoTxs(wallet.publicKey.toBase58());
     }
   }, [wallet.publicKey, connection, getUserSOLBalance, fetchTransactions, loadIcoTxs]);
+
+  const handleBet = useCallback(async (eventId: string, optionId: string, amount: number) => {
+    if (!marketUserId) return;
+    setMarketEvents((prev) =>
+      prev.map((ev) =>
+        ev.id === eventId
+          ? { ...ev, totalLiquidity: Number(ev.totalLiquidity) + amount }
+          : ev,
+      ),
+    );
+    try {
+      await placeBet(eventId, { userId: marketUserId, optionId, amount });
+      await loadMarketData();
+      notify({ type: 'success', message: 'Bet submitted' });
+    } catch (err: any) {
+      notify({ type: 'error', message: err?.message || 'Failed to submit bet' });
+      await loadMarketData();
+    }
+  }, [marketUserId, loadMarketData]);
 
   const onCopy = async () => { if (!walletAddress) return; await navigator.clipboard.writeText(walletAddress); setCopied(true); setTimeout(() => setCopied(false), 1500); };
   const onBuy = (p: IcoProject) => { setSelectedProject(p); setModal('buy'); };
@@ -1371,9 +1479,13 @@ export const HomeView: FC = () => {
                 <div className="text-sm font-semibold text-white">Prediction Markets</div>
                 <Badge color="rgba(16,185,129,0.12)"><span className="text-emerald-400">Live</span></Badge>
               </div>
-              <p className="text-xs text-white/30">Bet on crypto outcomes with SOL. Powered by on-chain smart contracts.</p>
+              <p className="text-xs text-white/30">Bet on real-time events with custodial wallet settlement.</p>
             </div>
-            {PREDICTION_MARKETS.map(m => <PredictionCard key={m.id} market={m} />)}
+            {marketLoading && <div className="text-xs text-white/40">Loading market events...</div>}
+            {marketError && <div className="text-xs text-red-400">{marketError}</div>}
+            {!marketLoading && marketEvents.map(m => (
+              <PredictionCard key={m.id} market={m} userId={marketUserId} onBet={handleBet} />
+            ))}
           </div>
         )}
 
@@ -1387,6 +1499,39 @@ export const HomeView: FC = () => {
         {/* ── Portfolio Tab ── */}
         {activeTab === 'portfolio' && (
           <div className="space-y-3">
+            <div className={`${glass.card} rounded-2xl p-4`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-white/35">Custodial Wallet</div>
+                  <div className="text-lg font-bold text-white">${dashboardWalletBalance.toFixed(2)}</div>
+                </div>
+                <button
+                  onClick={async () => { if (marketUserId) { await deposit(marketUserId, 25); await loadMarketData(); } }}
+                  className="rounded-xl px-3 py-2 text-xs font-semibold text-white"
+                  style={{ background: 'rgba(16,185,129,0.22)', border: '1px solid rgba(16,185,129,0.4)' }}
+                >
+                  Deposit +25
+                </button>
+              </div>
+            </div>
+            {marketTokens.length > 0 && (
+              <div className="grid grid-cols-1 gap-2">
+                {marketTokens.map((token) => (
+                  <div key={token.id} className={`${glass.card} rounded-2xl p-4`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-white">{token.name} ({token.symbol})</div>
+                        <div className="text-xs text-white/30">Price: ${Number(token.price).toFixed(4)} · MCap: ${(Number(token.price) * Number(token.supply)).toFixed(0)}</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={async () => { if (marketUserId) { await buyToken(token.id, marketUserId, 1); await loadMarketData(); } }} className="rounded-lg px-2 py-1 text-xs text-emerald-300" style={{ background: 'rgba(16,185,129,0.12)' }}>Buy</button>
+                        <button onClick={async () => { if (marketUserId) { await sellToken(token.id, marketUserId, 1); await loadMarketData(); } }} className="rounded-lg px-2 py-1 text-xs text-red-300" style={{ background: 'rgba(239,68,68,0.12)' }}>Sell</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             {myVeksels.length === 0 ? (
               <div className={`${glass.card} rounded-2xl py-16 text-center`}>
                 <div className="text-4xl mb-4 opacity-30">🎫</div>
@@ -1490,6 +1635,31 @@ export const HomeView: FC = () => {
         {/* ── History Tab ── */}
         {activeTab === 'history' && (
           <div className="space-y-3">
+            <div className={`${glass.card} rounded-2xl p-5`}>
+              <div className="text-sm font-semibold text-white mb-3">Global Feed</div>
+              <div className="space-y-2">
+                {marketFeed.slice(0, 12).map((item) => (
+                  <div key={item.id} className="rounded-xl px-3 py-2" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                    <div className="text-[10px] text-violet-300">{item.type}</div>
+                    <div className="text-xs text-white/75">{item.message}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className={`${glass.card} rounded-2xl p-5`}>
+              <div className="text-sm font-semibold text-white mb-3">Wallet Transactions</div>
+              <div className="space-y-2">
+                {walletHistory.slice(0, 20).map((tx) => (
+                  <div key={tx.id} className="rounded-xl px-3 py-2 flex items-center justify-between" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                    <div>
+                      <div className="text-[10px] text-white/40">{tx.type}</div>
+                      <div className="text-xs text-white/70">{tx.description}</div>
+                    </div>
+                    <div className="text-xs font-semibold text-white">${Number(tx.amount).toFixed(2)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
             {icoTxs.length > 0 && (
               <div className={`${glass.card} rounded-2xl p-5`}>
                 <div className="flex items-center justify-between mb-4">

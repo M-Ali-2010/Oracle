@@ -1,3 +1,5 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -12,7 +14,10 @@ const nextConfig = {
     '@solana/wallet-adapter-react-ui',
     '@metaplex-foundation/mpl-token-metadata',
   ],
-  turbopack: {},
+  // Use this app as workspace root (avoid picking ~/package-lock.json and breaking Turbopack cache).
+  turbopack: {
+    root: path.join(__dirname),
+  },
   async rewrites() {
     const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
     return [

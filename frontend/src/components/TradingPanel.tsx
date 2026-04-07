@@ -237,7 +237,7 @@ const TradingPanel: FC = () => {
                 boxShadow: backendOnline ? '0 0 6px #34d399' : 'none',
               }}
             />
-            {backendOnline === null ? 'Connecting' : backendOnline ? 'Binance Testnet' : 'Offline'}
+            {backendOnline === null ? 'Connecting' : backendOnline ? 'Live Trading' : 'Offline'}
           </span>
         </div>
 
@@ -337,7 +337,7 @@ const TradingPanel: FC = () => {
                   {priceUp ? '▲' : '▼'} {Math.abs(ticker.priceChangePct).toFixed(2)}%
                 </div>
                 <div className="text-[10px] text-slate-600 mt-0.5">
-                  H: ${ticker.high24h.toLocaleString()} · L: ${ticker.low24h.toLocaleString()}
+                 H: ${ticker.high24h.toLocaleString('en-US')} · L: ${ticker.low24h.toLocaleString('en-US')}
                 </div>
               </div>
             </div>
@@ -400,7 +400,7 @@ const TradingPanel: FC = () => {
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
           >
             <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-600 mb-2">
-              Binance Testnet Balance
+              Paper Trading Balance
             </div>
             <div className="flex gap-3 flex-wrap">
               {balances.slice(0, 6).map((b) => (
