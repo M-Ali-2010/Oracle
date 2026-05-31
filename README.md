@@ -1,224 +1,231 @@
-# Oracle-Pro — Full-Stack Integration
+# 🚀 Oracle-Pro — Full-Stack Web3 Платформа
 
-Solana Wallet + ICO Dashboard + Binance AI Trading
+### Solana Wallet + ICO Dashboard + Binance AI Trading
 
-```
-Frontend (Next.js :3000)  ←→  Backend (NestJS :4000)  ←→  Binance Testnet
-```
+Oracle-Pro — это полнофункциональная Web3-платформа, объединяющая работу с сетью Solana, ICO-панель управления, криптовалютный портфель и модуль алгоритмической торговли через Binance Testnet.
 
 ---
 
-## Project Structure
+# 📌 Возможности проекта
 
-```
-project-root/
-├── frontend/                   ← Next.js 13 (React + TypeScript)
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── TradingPanel.tsx   ← NEW: Binance trading widget
-│   │   │   ├── AppBar.tsx         ← Updated: network badges
-│   │   │   └── ...existing...
-│   │   ├── lib/
-│   │   │   └── tradingApi.ts      ← NEW: typed backend client
-│   │   ├── views/home/
-│   │   │   └── index.tsx          ← Updated: +Trading tab
-│   │   ├── contexts/
-│   │   │   └── ContextProvider.tsx ← Updated: env-driven network
-│   │   └── pages/
-│   │       └── _app.tsx           ← Updated: cleaner layout
-│   ├── next.config.js             ← Updated: backend proxy rewrites
-│   └── .env.local                 ← NEXT_PUBLIC_API_URL etc.
-│
-├── backend/                    ← NestJS (TypeScript)
-│   ├── src/
-│   │   ├── binance/
-│   │   │   ├── binance.service.ts   ← Binance REST + HMAC signing
-│   │   │   ├── binance.controller.ts ← /api/binance/ticker|candles|balance
-│   │   │   └── binance.module.ts
-│   │   ├── trading/
-│   │   │   ├── trading.service.ts   ← RSI strategy + order execution
-│   │   │   ├── trading.controller.ts ← /api/trading/signal|execute
-│   │   │   └── trading.module.ts
-│   │   ├── common/
-│   │   │   └── indicators.ts        ← RSI, MACD, EMA (pure math)
-│   │   ├── app.module.ts
-│   │   └── main.ts                  ← Port 4000, CORS enabled
-│   ├── .env                         ← BINANCE_API_KEY etc.
-│   └── package.json
-│
-└── README.md
-```
+## 💳 Solana Wallet
+
+- Подключение Phantom и Solflare
+- Отображение баланса SOL
+- Отправка и получение SOL
+- Devnet Airdrop
+- История транзакций
+- Управление SPL-токенами
+
+## 🚀 ICO Dashboard
+
+- Покупка токенов ICO
+- Управление инвестициями
+- Отслеживание портфеля
+- Статистика прибыли и убытков (P&L)
+- Работа с несколькими активными проектами
+
+## 🔄 Jupiter Integration
+
+- Обмен SOL на любые SPL-токены
+- Получение актуальных курсов
+- Быстрые свопы внутри приложения
+
+## 🤖 Binance AI Trading
+
+- Получение рыночных данных Binance Testnet
+- Анализ торговых сигналов
+- Автоматическая торговля
+- Управление рисками
+- Технические индикаторы
+- Логирование торговых операций
 
 ---
 
-## Quick Start
+# 🏗 Архитектура проекта
 
-### Step 1 — Get Binance Testnet Keys (free, 2 min)
-
-1. Go to https://testnet.binance.vision/
-2. Click **Log In with GitHub**
-3. Click **Generate HMAC_SHA256 Key**
-4. Copy **API Key** and **Secret Key**
-
-### Step 2 — Configure Backend
-
-```bash
-cd backend
-cp .env.example .env
-# Edit .env:
-#   BINANCE_API_KEY=your_key_here
-#   BINANCE_SECRET_KEY=your_secret_here
-#   BINANCE_TESTNET=true
-#   PORT=4000
-```
-
-### Step 3 — Start Backend
-
-```bash
-cd backend
-npm install
-npm run start:dev
-# → 🚀 Oracle-Pro Backend → http://localhost:4000
-# → ✅ Binance connected — TESTNET
-```
-
-### Step 4 — Configure Frontend
-
-```bash
-cd frontend
-# Edit .env.local (already configured):
-#   NEXT_PUBLIC_API_URL=http://localhost:4000
-#   NEXT_PUBLIC_SOLANA_NETWORK=devnet
-#   NEXT_PUBLIC_SOLANA_RPC_URL=https://api.devnet.solana.com
-```
-
-### Step 5 — Start Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-# → http://localhost:3000
-```
+text Frontend (Next.js :3000)         ↓ Backend (NestJS :4000)         ↓ Binance Testnet API 
 
 ---
 
-## API Endpoints (Backend)
+# 📂 Структура проекта
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | /api/binance/ticker/:symbol | Live price + 24h stats |
-| GET | /api/binance/candles/:symbol?interval=15m&limit=100 | OHLCV candles |
-| GET | /api/binance/balance | Testnet account balances |
-| GET | /api/trading/signal?symbol=BTCUSDT&timeframe=15m | RSI signal (no trade placed) |
-| POST | /api/trading/execute | Analyse + place order |
-
-### POST /api/trading/execute — Body
-
-```json
-{
-  "symbol": "BTCUSDT",
-  "timeframe": "15m",
-  "maxPosPct": 2,
-  "stopLossPct": 1.5,
-  "takeProfitPct": 3
-}
-```
+text project-root/ │ ├── frontend/ │   ├── components/ │   ├── views/ │   ├── contexts/ │   ├── pages/ │   └── lib/ │ ├── backend/ │   ├── binance/ │   ├── trading/ │   ├── common/ │   └── app.module.ts │ └── README.md 
 
 ---
 
-## Frontend Features
+# ⚙️ Технологии
 
-### Existing (untouched)
-- ✅ Solana wallet connection (Phantom, Solflare)
-- ✅ SOL balance display
-- ✅ Send / Receive SOL
-- ✅ Jupiter swap (SOL → any SPL)
-- ✅ Devnet airdrop + ICO token airdrop
-- ✅ ICO projects (5 active projects)
-- ✅ SPL token purchase + minting
-- ✅ Portfolio view with P&L
-- ✅ Transaction history
+### Frontend
 
-### New (integrated)
-- ✅ **Trading tab** — real Binance testnet data
-- ✅ Symbol dropdown (BTC, ETH, SOL, BNB, XRP)
-- ✅ Timeframe dropdown (1m, 5m, 15m, 1h, 4h)
-- ✅ Live ticker price + 24h change
-- ✅ BUY / SELL / HOLD signal with confidence bar
-- ✅ RSI, MACD, EMA9, EMA50 indicator grid
-- ✅ Reasoning text from strategy engine
-- ✅ Execute trade button (testnet orders)
-- ✅ Trade result: Order ID, side, qty, price, SL/TP
-- ✅ Binance balance display
-- ✅ **Auto-Trading toggle** — polls every 30s, auto-executes
-- ✅ Activity log
+- Next.js 13
+- React
+- TypeScript
+- Tailwind CSS
+- Solana Wallet Adapter
 
----
+### Backend
 
-## Trading Strategy (RSI-based)
+- NestJS
+- TypeScript
+- Binance REST API
+- HMAC SHA256 Authentication
 
-```
-BUY  — RSI < 30 (oversold) AND price > EMA50
-SELL — RSI > 70 (overbought) OR MACD histogram strongly negative
-HOLD — everything else
-```
+### Blockchain
 
-Confidence is normalized 50–100% based on signal strength.
+- Solana Devnet
+- SPL Tokens
+- Jupiter Aggregator
+
+### Trading
+
+- Binance Testnet
+- RSI
+- MACD
+- EMA
+- Автоматические торговые сигналы
 
 ---
 
-## Environment Variables
+# 📈 Торговая стратегия
 
-### Backend (.env)
-| Variable | Default | Description |
-|----------|---------|-------------|
-| PORT | 4000 | Server port |
-| BINANCE_API_KEY | — | Testnet API key |
-| BINANCE_SECRET_KEY | — | Testnet secret |
-| BINANCE_TESTNET | true | Use testnet endpoint |
-| DEFAULT_SYMBOL | BTCUSDT | Default trading pair |
-| DEFAULT_TIMEFRAME | 15m | Default chart interval |
-| MAX_POSITION_PCT | 2 | % of USDT balance per trade |
-| STOP_LOSS_PCT | 1.5 | Stop-loss percentage |
-| TAKE_PROFIT_PCT | 3 | Take-profit percentage |
+Используется комбинация популярных технических индикаторов.
 
-### Frontend (.env.local)
-| Variable | Value | Description |
-|----------|-------|-------------|
-| NEXT_PUBLIC_API_URL | http://localhost:4000 | Backend URL |
-| NEXT_PUBLIC_SOLANA_NETWORK | devnet | Solana network |
-| NEXT_PUBLIC_SOLANA_RPC_URL | https://api.devnet.solana.com | RPC endpoint |
-| NEXT_PUBLIC_TREASURY_WALLET | DVXt9...Y7FE | ICO treasury address |
+### BUY
+
+- RSI < 30
+- Цена выше EMA50
+
+### SELL
+
+- RSI > 70
+- Или отрицательный MACD
+
+### HOLD
+
+- Во всех остальных случаях
+
+Система рассчитывает уровень уверенности сигнала от 50% до 100%.
 
 ---
 
-## Proxy Architecture
+# 🔥 Возможности Trading Dashboard
 
-```
-Browser → Next.js (:3000)
-           /api/binance/*  →  rewrites  →  NestJS (:4000)/api/binance/*
-           /api/trading/*  →  rewrites  →  NestJS (:4000)/api/trading/*
-           /api/price      →  Next.js API route (CoinGecko)
-           /api/buy        →  Next.js API route (Solana SPL)
-           /api/sell       →  Next.js API route (Solana SPL)
-           /api/chart      →  Next.js API route (mock chart data)
-           /api/portfolio  →  Next.js API route (Solana on-chain)
-```
-
-No CORS issues — browser only talks to Next.js. Next.js proxies to NestJS server-side.
+- Live цена актива
+- Изменение цены за 24 часа
+- Выбор торговой пары
+- Выбор таймфрейма
+- Индикаторы RSI / MACD / EMA
+- AI-анализ рынка
+- Автоматическое выставление ордеров
+- Управление Stop Loss
+- Управление Take Profit
+- Журнал торговых операций
 
 ---
 
-## Troubleshooting
+# 🌐 API Endpoints
 
-**Backend won't start**: Check `BINANCE_API_KEY` is set in `backend/.env`
+## Binance
 
-**"Backend Offline" in Trading tab**: Start backend with `npm run start:dev` in `/backend`
+http GET /api/binance/ticker/:symbol 
 
-**Wallet won't connect**: Make sure Phantom/Solflare is set to Devnet
+Получение текущей цены и статистики.
 
-**Trade execution fails**: Binance testnet needs USDT balance — get free testnet funds at https://testnet.binance.vision/
+http GET /api/binance/candles/:symbol 
 
-**SOL balance shows 0**: Connect wallet and click refresh, or request devnet airdrop
+Получение свечей OHLCV.
 
+http GET /api/binance/balance 
+
+Получение баланса Binance Testnet.
+
+---
+
+## Trading
+
+http GET /api/trading/signal 
+
+Получение торгового сигнала.
+
+http POST /api/trading/execute 
+
+Выполнение сделки.
+
+---
+
+# 🚀 Запуск проекта
+
+## Backend
+
+bash cd backend  npm install  npm run start:dev 
+
+Сервер будет доступен по адресу:
+
+text http://localhost:4000 
+
+---
+
+## Frontend
+
+bash cd frontend  npm install  npm run dev 
+
+Приложение будет доступно по адресу:
+
+text http://localhost:3000 
+
+---
+
+# 🔐 Переменные окружения
+
+## Backend
+
+env PORT=4000  BINANCE_API_KEY=YOUR_API_KEY  BINANCE_SECRET_KEY=YOUR_SECRET_KEY  BINANCE_TESTNET=true  DEFAULT_SYMBOL=BTCUSDT  DEFAULT_TIMEFRAME=15m 
+
+---
+
+## Frontend
+
+env NEXT_PUBLIC_API_URL=http://localhost:4000  NEXT_PUBLIC_SOLANA_NETWORK=devnet  NEXT_PUBLIC_SOLANA_RPC_URL=https://api.devnet.solana.com 
+
+---
+
+# 🛡 Основные возможности
+
+✅ Solana Wallet
+
+✅ SPL Token Management
+
+✅ ICO Platform
+
+✅ Binance Integration
+
+✅ AI Trading Signals
+
+✅ Auto Trading
+
+✅ Portfolio Analytics
+
+✅ Transaction History
+
+✅ Risk Management
+
+✅ Full-Stack Architecture
+
+---
+
+# 👨‍💻 Автор
+
+Muhammad Ali Zhurakhanov
+
+Full Stack Mobile & Web Developer
+
+📍 Tashkent, Uzbekistan
+
+GitHub: https://github.com/M-Ali-2010
+
+---
+
+# 📄 Лицензия
+
+Данный проект создан в образовательных и демонстрационных целях и может использоваться как основа для дальнейшей разработки Web3, FinTech и Trading-платфор# Oracle
